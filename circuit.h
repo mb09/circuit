@@ -12,7 +12,6 @@ class Circuit{
 public:
     vector<ofVec3f> pts;
     int direction;
-//    ofVec3f head;
     float speed;
     int id;
     bool isDead;
@@ -36,9 +35,11 @@ public:
     void update(vector<Circuit> *circuits){
         if(!isDead)
         {
+            //calculate the next position
             ofVec3f move = ofVec3f(cos(direction * TWO_PI/numTurns),sin(direction * TWO_PI/numTurns)) * speed;
             ofVec3f newHead = pts[pts.size()-1] + move;
             
+            //look for collision with all other circuits
             for(int i=0;i<circuits->size();i++)
             {
                 Circuit c = circuits->at(i);
@@ -50,19 +51,24 @@ public:
                 {
                     for(int j=1;j<c.pts.size();j++)
                     {
+                        //dead if collide with other circuits
                         if(doIntersect(pts[pts.size()-1], newHead, c.pts[j-1], c.pts[j]))
                         {
                             isDead = true;
+                            break;
                         }
                     }
                 }
             }
             if(!isDead)
             {
+                //dead if out of bound
                 if(newHead.x < 0 || newHead.y < 0 || newHead.x > ofGetWidth() || newHead.y > ofGetHeight())
                 {
                     isDead = true;
                 }
+                
+                //move the head and make some random turns
                 pts[pts.size()-1] = newHead;
                 if(ofRandom(1) > (1-turnChance))
                 {
@@ -83,12 +89,7 @@ public:
         }
         glEnd();
         
-//        ofSetColor(0);
         ofFill();
-//        ofDrawCircle(pts[0], 5);
-//        ofDrawCircle(pts[pts.size()-1], 5);
-//        ofSetColor(color);
-//        ofNoFill();
         ofDrawCircle(pts[0], 3);
         ofDrawCircle(pts[pts.size()-1], 3);
     }

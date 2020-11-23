@@ -9,7 +9,6 @@ int numTurns = (int)ofRandom(2,5) * 2;
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-
 }
 
 //--------------------------------------------------------------
@@ -18,7 +17,10 @@ void ofApp::update(){
     {
         circuits[i].update(&circuits);
     }
+    //add new circuits
     keyPressed(' ');
+    
+    //clear canvas
     if(ofGetFrameNum() % 200 == 0)
     {
         keyPressed('1');
@@ -28,9 +30,6 @@ void ofApp::update(){
 //--------------------------------------------------------------
 void ofApp::draw(){
     ofBackground(0);
-//    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-    ofSetColor(0,255,255);
-    ofSetLineWidth(3);
     for(int i=0;i<circuits.size();i++)
     {
         circuits[i].draw();
@@ -39,6 +38,7 @@ void ofApp::draw(){
 
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){
+    //add a group of circuit line with similar origin and color
     if(key == ' ')
     {
         for(int j=0;j<5;j++)
@@ -63,6 +63,8 @@ void ofApp::keyPressed(int key){
             }
         }
     }
+    
+    //clear canvas, generate new color palette and turning parameters
     if(key == '1')
     {
         circuits.clear();
