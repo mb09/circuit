@@ -8,6 +8,32 @@
 #ifndef circuit_h
 #define circuit_h
 
+class Segment{
+public:
+    float progress;
+    float length;
+    float speed;
+    ofColor color;
+    ofVec3f offset;
+    
+    Segment(float offsetScale){
+        progress = ofRandom(0, 1);
+        length = ofRandom(0.03, 0.2);
+        speed = ofRandom(0.001, 0.005);
+        if(ofRandom(1)< 0.5) speed *= -1;
+        
+        
+        offset = ofVec3f(ofRandom(-offsetScale,offsetScale), ofRandom(-offsetScale,offsetScale));
+        
+    }
+    
+    void update(){
+        progress += speed;
+        if(progress > 1) progress -= 1;
+        else if(progress < 0) progress += 1;
+    }
+};
+
 class Circuit{
 public:
     vector<ofVec3f> pts;
@@ -19,8 +45,14 @@ public:
     float turnChance;
     int numTurns;
     int lineWidth;
+    float offsetScale;
     
-    Circuit(ofVec3f _head, int _direction, ofColor _color, float _turnChance, int _numTurns){
+    float sumLength;
+    vector<float>checkPts;
+    
+    vector<Segment> segments;
+    
+    Circuit(ofVec3f _head, int _direction, ofColor _color, float _turnChance, int _numTurns, float _offsetScale){
         color = _color;
         turnChance = _turnChance;
         numTurns = _numTurns;
@@ -29,10 +61,28 @@ public:
         pts.push_back(ofVec3f(_head));
         speed = ofRandom(10, 25);
         isDead = false;
-        lineWidth = ofRandom(1,4);
+        lineWidth = pow(1.3,ofRandom(1,4) * ofRandom(1,5));
+        
+        offsetScale = _offsetScale;
+        
+        sumLength = 0;
+        
+        for(int i=0;i<ofRandom(5,30);i++)
+        {
+            Segment s(offsetScale);
+            s.color = _color;
+            s.color.setBrightness(ofRandom(120,180));
+            s.color.setHue(s.color.getHue() + ofRandom(-15,15));
+            segments.push_back(s);
+            
+        }
     }
     
     void update(vector<Circuit> *circuits){
+        for(int i=0;i<segments.size();i++)
+        {
+            segments[i].update();
+        }
         if(!isDead)
         {
             //calculate the next position
@@ -52,7 +102,7 @@ public:
                     for(int j=1;j<c.pts.size();j++)
                     {
                         //dead if collide with other circuits
-                        if(doIntersect(pts[pts.size()-1], newHead, c.pts[j-1], c.pts[j]))
+                        if(doIntersect(pts[pts.size()-1], newHead, c.pts[j-1], c.pts[j]) && ofRandom(1) < 0.8)
                         {
                             isDead = true;
                             break;
@@ -75,14 +125,30 @@ public:
                     turn();
                 }
                 
+                sumLength = 0;
+                for(int i=1;i<pts.size();i++)
+                {
+                    sumLength += (pts[i+1] - pts[i]).length();
+                }
+                
+                checkPts.clear();
+                checkPts.push_back(0);  //first pt
+                float sumLength2 = 0;
+                for(int i=1;i<pts.size();i++)
+                {
+                    sumLength2 += (pts[i+1] - pts[i]).length();
+                    checkPts.push_back((float)sumLength2 / sumLength);
+                }
             }
         }
     }
     
     void draw(){
-        ofSetColor(color);
+        ofSetColor(color, 500.0 / lineWidth);
         ofSetLineWidth(lineWidth);
         glBegin(GL_LINE_STRIP);
+        
+        ofSetCircleResolution(numTurns);
         for(int i=0;i<pts.size();i++)
         {
             glVertex3f(pts[i].x , pts[i].y, pts[i].z);
@@ -92,6 +158,96 @@ public:
         ofFill();
         ofDrawCircle(pts[0], 3);
         ofDrawCircle(pts[pts.size()-1], 3);
+        
+        for(int i=0;i<segments.size();i++)
+        {
+            float segBeginFactor = ofClamp(segments[i].progress, 0, 1);
+            ofVec3f segBegin = pointOnCircuit(segBeginFactor);
+            float segEndFactor = ofClamp(segments[i].progress + segments[i].length, 0, 1);
+            ofVec3f segEnd = pointOnCircuit(segEndFactor);
+            ofSetColor(segments[i].color, 1000 / lineWidth);
+            
+            //rejecting top left corner segments (from invalid pointOnCircuit returns)
+            if(segBegin.length() > 1 && segEnd.length() > 1)
+            {
+                glBegin(GL_LINE_STRIP);
+                
+                glVertex3f(segBegin.x + segments[i].offset.x, segBegin.y + segments[i].offset.y, segBegin.z + segments[i].offset.z);
+                
+                if(checkPts.size() > 0)
+                {
+                    for(int j=1;j<checkPts.size()-1;j++)
+                    {
+                        if(checkPts[j] > segments[i].progress && checkPts[j] < segments[i].progress + segments[i].length)
+                        {
+                            glVertex3f(pts[j].x + segments[i].offset.x, pts[j].y + segments[i].offset.y, pts[j].z + segments[i].offset.z);
+                        }
+                    }
+                }
+                
+                glVertex3f(segEnd.x + segments[i].offset.x, segEnd.y + segments[i].offset.y, segEnd.z + segments[i].offset.z);
+                
+                
+                glEnd();
+            }
+            
+            ofSetColor(segments[i].color, 100.0 / lineWidth);
+            ofNoFill();
+            
+            //circles
+            ofDrawCircle(segBegin.x + segments[i].offset.x, segBegin.y +   segments[i].offset.y, segBegin.z + segments[i].offset.z, lineWidth / 4);
+
+            if(checkPts.size() > 0)
+            {
+                for(int j=1;j<checkPts.size()-1;j++)
+                {
+                    if(checkPts[j] > segments[i].progress && checkPts[j] <   segments[i].progress + segments[i].length)
+                    {
+                        ofDrawCircle(pts[j].x + segments[i].offset.x, pts[j].y + segments[i].offset.y, pts[j].z + segments[i].offset.z, lineWidth / 4);
+                    }
+                }
+            }
+            ofDrawCircle(segEnd.x + segments[i].offset.x, segEnd.y + segments[i].offset.y, segEnd.z + segments[i].offset.z, lineWidth / 4);
+            
+            
+            //points
+            ofSetColor(segments[i].color);
+            glBegin(GL_POINTS);
+            if(checkPts.size() > 0)
+            {
+                glVertex3f(segBegin.x + segments[i].offset.x, segBegin.y +   segments[i].offset.y, segBegin.z + segments[i].offset.z);
+                for(int j=1;j<checkPts.size()-1;j++)
+               {
+                    if(checkPts[j] > segments[i].progress && checkPts[j] <   segments[i].progress + segments[i].length)
+                    {
+                        glVertex3f(pts[j].x + segments[i].offset.x, pts[j].y + segments[i].offset.y, pts[j].z + segments[i].offset.z);
+                    }
+                }
+                glVertex3f(segEnd.x + segments[i].offset.x, segEnd.y + segments[i].offset.y, segEnd.z + segments[i].offset.z);
+            }
+
+            glEnd();
+            
+            
+            
+//            ofNoFill();
+//            ofDrawCircle(pointOnCircuit(segments[i].progress) + segments[i].offset, 1.5);
+        }
+    }
+    
+    ofVec3f pointOnCircuit(float progress)
+    {
+        for(int i=0;i<checkPts.size();i++)
+        {
+            if(progress < checkPts[i])
+            {
+                float checkPtDiff = checkPts[i] - checkPts[i-1];
+                float progressDiff = progress - checkPts[i-1];
+                float progressDiffFactor = progressDiff / checkPtDiff;
+                
+                return progressDiffFactor * pts[i-1] + (1 - progressDiffFactor) * pts[i];
+            }
+        }
     }
     
     void turn(){
